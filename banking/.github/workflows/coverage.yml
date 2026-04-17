@@ -1,0 +1,42 @@
+name: Code Coverage
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  coverage:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v3
+      
+    - name: Install dependencies
+      run: |
+        sudo apt update
+        sudo apt install -y lcov gcovr
+        pip install gcovr
+        
+    - name: Configure with coverage flags
+      run: |
+        mkdir build && cd build
+        cmake -DENABLE_COVERAGE=ON ..
+        
+    - name: Build
+      run: |
+        cd build
+        make
+        
+    - name: Run tests
+      run: |
+        cd build
+        ./tests/run_tests
+        
+    - name: Generate coverage report for Coveralls
+      uses: threeal/gcovr-action@latest
+      with:
+        coveralls-send: true
+        coveralls-repo-token: ${{ secrets.COVERALLS_REPO_TOKEN }}
