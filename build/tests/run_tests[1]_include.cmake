@@ -1,0 +1,5 @@
+if(EXISTS "/home/vboxuser/Lab5/banking/build/tests/run_tests[1]_tests.cmake")
+  include("/home/vboxuser/Lab5/banking/build/tests/run_tests[1]_tests.cmake")
+else()
+  add_test(run_tests_NOT_BUILT run_tests_NOT_BUILT)
+endif()
