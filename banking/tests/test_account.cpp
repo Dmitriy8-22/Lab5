@@ -1,60 +1,199 @@
 #include <gtest/gtest.h>
+#include <gmock/gmock.h>
 #include <stdexcept>
-#include "../Account.h"
 
-TEST(AccountTest, ConstructorSetsValues) {
-    Account acc(5, 1000);
-    EXPECT_EQ(acc.id(), 5);
-    EXPECT_EQ(acc.GetBalance(), 1000);
+#include "../Transaction.h"
+#include "mock_account.h"
+
+using ::testing::Return;
+using ::testing::_;
+
+TEST(TransactionTest, NegativeSumThrowsException) {
+    MockAccount from(1, 1000);
+    MockAccount to(2, 500);
+    Transaction transaction;
+
+    EXPECT_THROW(transaction.Make(from, to, -50), std::invalid_argument);
 }
 
-TEST(AccountTest, GetBalanceReturnsCurrentBalance) {
-    Account acc(1, 500);
-    EXPECT_EQ(acc.GetBalance(), 500);
+TEST(TransactionTest, SumLessThan100ThrowsException) {
+    MockAccount from(1, 1000);
+    MockAccount to(2, 500);
+    Transaction transaction;
+
+    EXPECT_THROW(transaction.Make(from, to, 50), std::logic_error);
 }
 
-TEST(AccountTest, ChangeBalanceWorksWhenLocked) {
-    Account acc(1, 1000);
-    acc.Lock();
-    acc.ChangeBalance(300);
-    EXPECT_EQ(acc.GetBalance(), 1300);
+TEST(TransactionTest, SameAccountThrowsException) {
+    MockAccount acc(1, 1000);
+    Transaction transaction;
+
+    EXPECT_THROW(transaction.Make(acc, acc, 100), std::logic_error);
 }
 
-TEST(AccountTest, ChangeBalanceThrowsWhenNotLocked) {
-    Account acc(1, 1000);
-    EXPECT_THROW(acc.ChangeBalance(100), std::runtime_error);
-    EXPECT_EQ(acc.GetBalance(), 1000);
+TEST(TransactionTest, FeeTooHighReturnsFalse) {
+    MockAccount from(1, 1000);
+    MockAccount to(2, 500);
+    Transaction transaction;
+    transaction.set_fee(150);
+
+    bool result = transaction.Make(from, to, 200);
+    EXPECT_FALSE(result);
 }
 
-TEST(AccountTest, LockThrowsWhenAlreadyLocked) {
-    Account acc(1, 1000);
-    EXPECT_NO_THROW(acc.Lock());
-    EXPECT_THROW(acc.Lock(), std::runtime_error);
-    EXPECT_NO_THROW(acc.ChangeBalance(100));
-    EXPECT_EQ(acc.GetBalance(), 1100);
+TEST(TransactionTest, SuccessfulTransaction) {
+    MockAccount from(1, 1000);
+    MockAccount to(2, 500);
+    Transaction transaction;
+
+    EXPECT_CALL(from, Lock()).Times(1);
+    EXPECT_CALL(to, Lock()).Times(1);
+    EXPECT_CALL(to, ChangeBalance(200)).Times(1);
+    EXPECT_CALL(from, GetBalance())
+        .WillOnce(Return(1000))
+        .WillOnce(Return(799));
+    EXPECT_CALL(from, ChangeBalance(-201)).Times(1);
+    EXPECT_CALL(to, GetBalance()).WillOnce(Return(700));
+    EXPECT_CALL(from, Unlock()).Times(1);
+    EXPECT_CALL(to, Unlock()).Times(1);
+
+    bool result = transaction.Make(from, to, 200);
+    EXPECT_TRUE(result);
 }
 
-TEST(AccountTest, UnlockAllowsLockAgain) {
-    Account acc(1, 1000);
-    acc.Lock();
-    acc.Unlock();
-    EXPECT_NO_THROW(acc.Lock());
+TEST(TransactionTest, RollbackOnDebitFailure) {
+    MockAccount from(1, 100);
+    MockAccount to(2, 500);
+    Transaction transaction;
+
+    EXPECT_CALL(from, Lock()).Times(1);
+    EXPECT_CALL(to, Lock()).Times(1);
+    EXPECT_CALL(to, ChangeBalance(200)).Times(1);
+    EXPECT_CALL(from, GetBalance())
+        .WillOnce(Return(100))
+        .WillOnce(Return(100));
+    EXPECT_CALL(to, ChangeBalance(-200)).Times(1);
+    EXPECT_CALL(to, GetBalance()).WillOnce(Return(500));
+    EXPECT_CALL(from, Unlock()).Times(1);
+    EXPECT_CALL(to, Unlock()).Times(1);
+
+    bool result = transaction.Make(from, to, 200);
+    EXPECT_FALSE(result);
 }
 
-TEST(AccountTest, MultipleLockUnlockCycles) {
-    Account acc(1, 1000);
-    for (int i = 0; i < 3; i++) {
-        acc.Lock();
-        acc.ChangeBalance(100);
-        acc.Unlock();
-    }
-    EXPECT_EQ(acc.GetBalance(), 1300);
+TEST(TransactionTest, DefaultFeeIsOne) {
+    Transaction transaction;
+    EXPECT_EQ(transaction.fee(), 1);
 }
 
-TEST(AccountTest, UnlockRequiresLockAgain) {
-    Account acc(1, 1000);
-    acc.Lock();
-    acc.ChangeBalance(100);
-    acc.Unlock();
-    EXPECT_THROW(acc.ChangeBalance(50), std::runtime_error);
+TEST(TransactionTest, SetAndGetFee) {
+    Transaction transaction;
+    transaction.set_fee(10);
+    EXPECT_EQ(transaction.fee(), 10);
+    transaction.set_fee(0);
+    EXPECT_EQ(transaction.fee(), 0);
+}
+
+TEST(TransactionTest, CreditAddsBalance) {
+    Account from(1, 1000);
+    Account to(2, 500);
+    Transaction transaction;
+
+    transaction.Make(from, to, 200);
+    EXPECT_EQ(to.GetBalance(), 700);
+}
+
+TEST(TransactionTest, DebitSubtractsBalance) {
+    Account from(1, 1000);
+    Account to(2, 500);
+    Transaction transaction;
+
+    transaction.Make(from, to, 200);
+    EXPECT_EQ(from.GetBalance(), 799);
+}
+
+TEST(TransactionTest, SaveToDataBaseOutput) {
+    Account from(1, 1000);
+    Account to(2, 500);
+    Transaction transaction;
+
+    testing::internal::CaptureStdout();
+    transaction.Make(from, to, 200);
+    std::string output = testing::internal::GetCapturedStdout();
+
+    EXPECT_NE(output.find("1 send to 2 $200"), std::string::npos);
+    EXPECT_NE(output.find("Balance 1 is"), std::string::npos);
+    EXPECT_NE(output.find("Balance 2 is"), std::string::npos);
+}
+
+TEST(TransactionTest, TransactionWithExactBalance) {
+    Account from(1, 201);
+    Account to(2, 500);
+    Transaction transaction;
+
+    bool result = transaction.Make(from, to, 200);
+
+    EXPECT_TRUE(result);
+    EXPECT_EQ(from.GetBalance(), 0);
+    EXPECT_EQ(to.GetBalance(), 700);
+}
+
+TEST(TransactionTest, TransactionWithMinimumSum) {
+    MockAccount from(1, 1000);
+    MockAccount to(2, 500);
+    Transaction transaction;
+
+    EXPECT_CALL(from, Lock()).Times(1);
+    EXPECT_CALL(to, Lock()).Times(1);
+    EXPECT_CALL(to, ChangeBalance(100)).Times(1);
+    EXPECT_CALL(from, GetBalance())
+        .WillOnce(Return(1000))
+        .WillOnce(Return(899));
+    EXPECT_CALL(from, ChangeBalance(-101)).Times(1);
+    EXPECT_CALL(to, GetBalance()).WillOnce(Return(600));
+    EXPECT_CALL(from, Unlock()).Times(1);
+    EXPECT_CALL(to, Unlock()).Times(1);
+
+    bool result = transaction.Make(from, to, 100);
+    EXPECT_TRUE(result);
+}
+
+TEST(TransactionTest, InsufficientFundsReturnsFalse) {
+    MockAccount from(1, 100);
+    MockAccount to(2, 500);
+    Transaction transaction;
+
+    EXPECT_CALL(from, Lock()).Times(1);
+    EXPECT_CALL(to, Lock()).Times(1);
+    EXPECT_CALL(to, ChangeBalance(200)).Times(1);
+    EXPECT_CALL(from, GetBalance())
+        .WillOnce(Return(100))
+        .WillOnce(Return(100));
+    EXPECT_CALL(to, ChangeBalance(-200)).Times(1);
+    EXPECT_CALL(to, GetBalance()).WillOnce(Return(500));
+    EXPECT_CALL(from, Unlock()).Times(1);
+    EXPECT_CALL(to, Unlock()).Times(1);
+
+    bool result = transaction.Make(from, to, 200);
+    EXPECT_FALSE(result);
+}
+
+TEST(TransactionTest, VerifyLockAndUnlockOrder) {
+    MockAccount from(1, 1000);
+    MockAccount to(2, 500);
+    Transaction transaction;
+
+    EXPECT_CALL(from, Lock()).Times(1);
+    EXPECT_CALL(to, Lock()).Times(1);
+    EXPECT_CALL(to, ChangeBalance(200)).Times(1);
+    EXPECT_CALL(from, GetBalance())
+        .WillOnce(Return(1000))
+        .WillOnce(Return(799));
+    EXPECT_CALL(from, ChangeBalance(-201)).Times(1);
+    EXPECT_CALL(to, GetBalance()).WillOnce(Return(700));
+    EXPECT_CALL(from, Unlock()).Times(1);
+    EXPECT_CALL(to, Unlock()).Times(1);
+
+    bool result = transaction.Make(from, to, 200);
+    EXPECT_TRUE(result);
 }
