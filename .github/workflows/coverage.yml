@@ -18,7 +18,7 @@ jobs:
       run: |
         sudo apt update
         sudo apt install -y lcov gcovr
-        pip install gcovr
+        pip install --user gcovr
         
     - name: Configure with coverage flags
       run: |
@@ -36,15 +36,20 @@ jobs:
         ./tests/run_tests
         
     - name: Generate coverage report
-      uses: threeal/gcovr-action@v1.0.0
+      run: |
+        cd build
+        gcovr --root .. \
+              --exclude '.*/tests/.*' \
+              --exclude '.*/build/.*' \
+              --exclude '.*/_deps/.*' \
+              --exclude '.*/googletest/.*' \
+              --exclude '.*/CMakeFiles/.*' \
+              --exclude '.*/mock_account.h' \
+              --coveralls coverage.json
+        
+    - name: Send to Coveralls
+      uses: coverallsapp/github-action@v2
       with:
-        root: banking
-        excludes: |
-          .*/tests/.*
-          .*/build/.*
-          .*/_deps/.*
-          .*/googletest/.*
-          .*/CMakeFiles/.*
-          .*/mock_account.h
-        coveralls-send: true
         github-token: ${{ secrets.GITHUB_TOKEN }}
+        file: build/coverage.json
+        format: json
