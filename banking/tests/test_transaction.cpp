@@ -155,5 +155,16 @@ TEST(TransactionTest, RollbackOnDebitFailure) {
     bool result = transaction.Make(from, to, 200);
     EXPECT_FALSE(result);
 }
+TEST(TransactionTest, TransactionWithExactBalance) {
+    Account from(1, 201);
+    Account to(2, 500);
+    Transaction transaction;
+    
+    bool result = transaction.Make(from, to, 200);
+    
+    EXPECT_TRUE(result);
+    EXPECT_EQ(from.GetBalance(), 0);
+    EXPECT_EQ(to.GetBalance(), 700);
+}
 
 

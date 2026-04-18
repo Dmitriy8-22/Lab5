@@ -2,7 +2,6 @@
 #include <stdexcept>
 #include "../Account.h"
 
-
 TEST(AccountTest, ConstructorSetsValues) {
     Account acc(5, 1000);
     
@@ -45,5 +44,17 @@ TEST(AccountTest, UnlockAllowsLockAgain) {
     acc.Unlock();
     
     EXPECT_NO_THROW(acc.Lock());
+}
+
+TEST(AccountTest, MultipleLockUnlockCycles) {
+    Account acc(1, 1000);
+    
+    for (int i = 0; i < 3; i++) {
+        acc.Lock();
+        acc.ChangeBalance(100);
+        acc.Unlock();
+    }
+    
+    EXPECT_EQ(acc.GetBalance(), 1300);
 }
 
