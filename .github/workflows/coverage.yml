@@ -17,7 +17,7 @@ jobs:
     - name: Install dependencies
       run: |
         sudo apt update
-        sudo apt install -y gcovr lcov
+        sudo apt install -y gcovr
         pip install --user gcovr
         
     - name: Configure with coverage flags
@@ -35,29 +35,11 @@ jobs:
         cd build
         ./tests/run_tests
         
-    - name: Find all gcda files
+    - name: Generate coverage.json for Coveralls
       run: |
         cd build
-        echo "=== All .gcda files ==="
-        find . -name "*.gcda" -type f
-        echo "=== Banking .gcda files ==="
-        find . -path "*/banking/*.gcda" -type f || echo "No banking gcda files found!"
-        echo "=== Banking directory in build ==="
-        ls -la banking/ || echo "No banking directory in build!"
-        echo "=== CMakeFiles directory ==="
-        find . -name "*.gcda" -path "*/CMakeFiles/banking.dir/*" -type f
-        
-    - name: Run gcovr on banking directory directly
-      run: |
-        cd build
-        gcovr --root ../banking --print-summary
-        
-    - name: Generate coverage with correct root
-      run: |
-        cd build
-        gcovr --root . \
+        gcovr --root .. \
               --filter '.*/banking/.*\.cpp$' \
-              --print-summary \
               --coveralls coverage.json
         
     - name: Send to Coveralls
@@ -66,4 +48,3 @@ jobs:
         github-token: ${{ secrets.GITHUB_TOKEN }}
         file: build/coverage.json
         format: coveralls
-      continue-on-error: true

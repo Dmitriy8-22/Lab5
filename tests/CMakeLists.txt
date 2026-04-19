@@ -13,9 +13,8 @@ FetchContent_Declare(
     GIT_TAG release-1.11.0
 )
 
-# Отключаем экспорт для Google Test
-set(INSTALL_GTEST OFF CACHE BOOL "Disable Google Test installation" FORCE)
-set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
+set(INSTALL_GTEST OFF)
+set(gtest_force_shared_crt ON)
 
 FetchContent_MakeAvailable(googletest)
 
@@ -45,3 +44,4 @@ endif()
 
 include(GoogleTest)
 gtest_discover_tests(run_tests)
+

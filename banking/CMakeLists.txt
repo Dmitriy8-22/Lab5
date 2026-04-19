@@ -12,3 +12,7 @@ add_library(banking STATIC
 
 target_include_directories(banking PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 
+if(ENABLE_COVERAGE)
+    target_compile_options(banking PRIVATE --coverage -g -O0)
+    target_link_options(banking PRIVATE --coverage)
+endif()
