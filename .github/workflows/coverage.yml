@@ -23,7 +23,7 @@ jobs:
     - name: Configure with coverage flags
       run: |
         mkdir -p build && cd build
-        cmake -DCMAKE_CXX_FLAGS="--coverage -g -O0" ../banking
+        cmake -DENABLE_COVERAGE=ON ..
         
     - name: Build
       run: |
@@ -32,8 +32,8 @@ jobs:
         
     - name: Run tests
       run: |
-        cd build
-        ./tests/run_tests
+        cd build/tests
+        ./run_tests
         
     - name: Generate coverage report
       run: |
