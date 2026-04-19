@@ -39,6 +39,7 @@ jobs:
       run: |
         cd build
         gcovr --root .. \
+              --filter '.*/banking/.*\.cpp$' \
               --exclude '.*/tests/.*' \
               --exclude '.*/build/.*' \
               --exclude '.*/_deps/.*' \
