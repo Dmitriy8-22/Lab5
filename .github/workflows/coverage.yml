@@ -17,7 +17,7 @@ jobs:
     - name: Install dependencies
       run: |
         sudo apt update
-        sudo apt install -y gcovr lcov
+        sudo apt install -y gcovr
         pip install --user gcovr
         
     - name: Configure with coverage flags
@@ -34,32 +34,23 @@ jobs:
       run: |
         cd build
         ./tests/run_tests
-        echo "Tests exit code: $?"
         
-    - name: Debug - find gcda files
+    - name: Generate coverage.json for Coveralls
       run: |
         cd build
-        echo "=== Looking for .gcda files ==="
-        find . -name "*.gcda" -type f || echo "No .gcda files found!"
-        echo "=== Looking for .gcno files ==="
-        find . -name "*.gcno" -type f || echo "No .gcno files found!"
-        echo "=== Build directory structure ==="
-        ls -la banking/
-        ls -la tests/
-        
-    - name: Generate coverage report directly
-      run: |
-        cd build
-        echo "=== Running gcovr ==="
-        gcovr --root .. --print-summary
-        echo "=== Generating coverage.json ==="
         gcovr --root .. \
               --filter '.*/banking/.*\.cpp$' \
+              --exclude-unreachable-branches \
+              --print-summary \
               --coveralls coverage.json
+        
+    - name: Debug coverage.json
+      run: |
+        cd build
         echo "=== coverage.json size ==="
-        ls -la coverage.json || echo "coverage.json not created!"
-        echo "=== coverage.json content (first 20 lines) ==="
-        head -20 coverage.json || echo "coverage.json is empty!"
+        ls -la coverage.json
+        echo "=== Looking for banking files in coverage.json ==="
+        grep -o '"name":"[^"]*"' coverage.json | head -20
         
     - name: Send to Coveralls
       uses: coverallsapp/github-action@v2
