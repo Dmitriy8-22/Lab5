@@ -17,13 +17,13 @@ jobs:
     - name: Install dependencies
       run: |
         sudo apt update
-        sudo apt install -y gcovr
+        sudo apt install -y gcovr lcov
         pip install --user gcovr
         
     - name: Configure with coverage flags
       run: |
         mkdir -p build && cd build
-        cmake -DENABLE_COVERAGE=ON ..
+        cmake -DENABLE_COVERAGE=ON -DCMAKE_BUILD_TYPE=Debug ..
         
     - name: Build
       run: |
@@ -32,8 +32,14 @@ jobs:
         
     - name: Run tests
       run: |
-        cd build/tests
-        ./run_tests
+        cd build
+        ./tests/run_tests
+        
+    - name: Debug - list gcda files
+      run: |
+        cd build
+        find . -name "*.gcda" -type f
+        find . -name "*.gcno" -type f
         
     - name: Generate coverage report
       run: |
@@ -46,7 +52,14 @@ jobs:
               --exclude '.*/googletest/.*' \
               --exclude '.*/CMakeFiles/.*' \
               --exclude '.*/mock_account.h' \
+              --print-summary \
+              --html --html-details coverage.html \
               --coveralls coverage.json
+        
+    - name: Show coverage.json content
+      run: |
+        cd build
+        cat coverage.json | head -50 || echo "coverage.json is empty or not found"
         
     - name: Send to Coveralls
       uses: coverallsapp/github-action@v2
@@ -54,3 +67,4 @@ jobs:
         github-token: ${{ secrets.GITHUB_TOKEN }}
         file: build/coverage.json
         format: coveralls
+      continue-on-error: true
